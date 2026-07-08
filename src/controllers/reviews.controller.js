@@ -59,8 +59,14 @@ const create = async (req, res, next) => {
   try {
     const { rating, comment } = req.body;
     const { rows } = await db.query(
-      `INSERT INTO reviews (place_id, user_id, rating, comment)
-       VALUES ($1,$2,$3,$4) RETURNING *`,
+      `WITH inserted_review AS (
+         INSERT INTO reviews (place_id, user_id, rating, comment)
+         VALUES ($1,$2,$3,$4) RETURNING *
+       )
+       SELECT r.id, r.rating, r.comment, r.created_at,
+              u.id AS user_id, u.name AS user_name, u.avatar_url
+       FROM inserted_review r
+       JOIN users u ON u.id = r.user_id`,
       [req.params.id, req.user.id, rating, comment || null]
     );
     respond.success(res, rows[0], 'Ulasan berhasil ditambahkan.', 201);
@@ -83,7 +89,13 @@ const update = async (req, res, next) => {
       return respond.error(res, 'Tidak diizinkan mengedit ulasan ini.', 403);
 
     const { rows } = await db.query(
-      'UPDATE reviews SET rating=$1, comment=$2, updated_at=NOW() WHERE id=$3 RETURNING *',
+      `WITH updated_review AS (
+         UPDATE reviews SET rating=$1, comment=$2, updated_at=NOW() WHERE id=$3 RETURNING *
+       )
+       SELECT r.id, r.rating, r.comment, r.created_at,
+              u.id AS user_id, u.name AS user_name, u.avatar_url
+       FROM updated_review r
+       JOIN users u ON u.id = r.user_id`,
       [rating, comment, req.params.id]
     );
     respond.success(res, rows[0], 'Ulasan berhasil diperbarui.');
